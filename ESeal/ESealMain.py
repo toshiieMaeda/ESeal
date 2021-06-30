@@ -4,6 +4,8 @@ from PIL import Image, ImageDraw, ImageFont
 #import cv2
 import math
 from datetime import datetime 
+import win32clipboard
+import io
 
 #電子判子作成
 #Copyright ©2021 TM. All rights reserved.
@@ -14,11 +16,11 @@ class ESealMainClass:
         self.sizeH = 80
 
         #self.font= u'ＭＳ 明朝'
-        self.font= u'msgothic.ttc'
-        self.charSize = 14
-        self.name = u'前田利家ですがなにか'        
+        self.font= u'meiryo.ttc'
+        self.charSize = 12
+        self.upper = u'警送運送課'
+        self.name = u'前田利家'        
         self.day = datetime(2021,6,14)
-        self.otherWord = 'test'
         self.lineWidth = 2 
  
     # #opencv
@@ -74,7 +76,6 @@ class ESealMainClass:
         c = ImageDraw.Draw(img)
 
         ###円描画
-        #font=(self.font, self.charSize)
         c.ellipse([(space,space), (self.sizeW - space, self.sizeH - space)], outline = 'red', width = self.lineWidth)
     
         ###線分描画
@@ -90,18 +91,26 @@ class ESealMainClass:
         c.line([(lineLeft,line1H),(lineLeft + lineLength,line1H)], fill='red', width = self.lineWidth)
         c.line([(lineLeft,line2H),(lineLeft + lineLength,line2H)], fill='red', width = self.lineWidth)
 
-        ###文字描画
-        font = ImageFont.truetype(self.font, self.charSize)
-
         #日付
         day ='{0:%Y/%m/%d}'.format(self.day)
-        charW,charH = c.textsize(day, font=font)
+        #文字サイズ調整
+        charW,charH,font = self.adjustCharSize(day, self.sizeW, line1H, c)
 
         charLeft, charTop = self.getTextPosition(cCenter, cCenter, charW, charH)
         c.text((charLeft, charTop), day, font=font, fill='red')
 
         #上段
+        charSize = self.charSize
         font = ImageFont.truetype(self.font, self.charSize)
+        while (charSize > 1):
+            charW,charH = c.textsize(self.upper, font=font)
+            if charW < line2H and charH < line1H :
+                break;
+            charSize -= 1
+            font = ImageFont.truetype(self.font, charSize)
+
+        charLeft, charTop = self.getTextPosition(cCenter, line1H - (line1H / 2) + 5 , charW, charH)
+        c.text((charLeft, charTop), self.upper, font=font, fill='red')
 
         #下段
         charSize = self.charSize
@@ -113,11 +122,12 @@ class ESealMainClass:
             charSize -= 1
             font = ImageFont.truetype(self.font, charSize)
 
-        charLeft, charTop = self.getTextPosition(cCenter, line2H + (line1H / 2) , charW, charH)
+        charLeft, charTop = self.getTextPosition(cCenter, line2H + (line1H / 2) - 5 , charW, charH)
         c.text((charLeft, charTop), self.name, font=font, fill='red')
 
         #保存
-        img.save('C:\\pg\\output\\test.png')
+        #img.save('C:\\pg\\output\\test.png')
+        self.copy_to_clipboard(img)
 
     def calcLine(self,centerDis):
         hypotenuse = self.sizeH / 2
@@ -140,6 +150,33 @@ class ESealMainClass:
     #     imgPIL = imgCV.copy()
     #     imgPIL = Image.fromarray(imgPIL)
     #     return imgPIL
+
+    def adjustCharSize(self, text, width, height, c):
+        charSize = self.charSize
+        font = ImageFont.truetype(self.font, charSize)
+        while (charSize > 1):
+            charW,charH = c.textsize(text, font=font)
+            if charW < width and charH < height :
+                break;
+            charSize -= 1
+            font = ImageFont.truetype(self.font, charSize)
+        
+        return charW,charH, font
+
+    def copy_to_clipboard(self, img):
+        # メモリストリームにBMP形式で保存してから読み出す
+        output = io.BytesIO()
+        img.convert('RGB').save(output, 'BMP')
+        data = output.getvalue()[14:]
+        output.close()
+        self.send_to_clipboard(win32clipboard.CF_DIB, data)
+
+    def send_to_clipboard(self, clip_type, data):
+        # クリップボードをクリアして、データをセットする
+        win32clipboard.OpenClipboard()
+        win32clipboard.EmptyClipboard()
+        win32clipboard.SetClipboardData(clip_type, data)
+        win32clipboard.CloseClipboard()
 
 if __name__=='__main__':
 
